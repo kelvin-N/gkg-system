@@ -31,4 +31,4 @@ if (USE_DEMO) {
   db = getFirestore(app);
 }
 
-export { auth, db 
+export { auth, db }; 
