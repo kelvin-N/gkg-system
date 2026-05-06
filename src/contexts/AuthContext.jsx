@@ -1,8 +1,15 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react";
-import { auth, db } from "../firebase/firebaseConfig";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  auth,
+  db,
+  doc,
+  getDoc,
+  setDoc,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "../firebase/firebaseConfig";
 
 const AuthContext = createContext();
 
@@ -19,18 +26,49 @@ export const AuthProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // 🔐 Track auth state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Check if user is admin
         try {
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-          const userData = userDoc.data();
-          const adminStatus = userData?.role === "admin";
-          setIsAdmin(adminStatus);
-          setUser({ ...firebaseUser, ...userData });
+          // 🔍 Get user role from Firestore
+          const userRef = doc(db, "users", firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+
+            console.log("USER DATA:", userData); // debug
+
+            // ✅ Check role ONLY (no email restriction)
+            const adminStatus = userData?.role === "admin";
+
+            setIsAdmin(adminStatus);
+            setUser({ ...firebaseUser, ...userData });
+          } else {
+            // 🆕 Auto-create admin user document if it doesn't exist
+            console.log("No user document found, creating admin user...");
+            const userData = {
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              role: "admin",
+              createdAt: new Date(),
+              lastLogin: new Date()
+            };
+
+            try {
+              await setDoc(doc(db, "users", firebaseUser.uid), userData);
+              console.log("Created admin user document:", userData);
+              setIsAdmin(true);
+              setUser({ ...firebaseUser, ...userData });
+            } catch (createError) {
+              console.error("Failed to create admin user document:", createError);
+              setIsAdmin(false);
+              setUser(firebaseUser);
+            }
+          }
         } catch (error) {
-          console.error("Error checking admin status:", error);
+          console.error("Error fetching user role:", error);
           setIsAdmin(false);
           setUser(firebaseUser);
         }
@@ -38,21 +76,72 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAdmin(false);
       }
+
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
+  // 🔐 Login function
   const login = async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+
+      // 🔍 Get role from Firestore
+      const userRef = doc(db, "users", firebaseUser.uid);
+      const userSnap = await getDoc(userRef);
+
+      let userData;
+
+      if (!userSnap.exists()) {
+        // 🆕 Create user document if it doesn't exist
+        userData = {
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+          role: "admin",
+          createdAt: new Date(),
+          lastLogin: new Date()
+        };
+
+        try {
+          await setDoc(userRef, userData);
+          console.log("Created new user document:", userData);
+        } catch (createError) {
+          console.error("Failed to create user document:", createError);
+          await signOut(auth);
+          return {
+            success: false,
+            error: "Failed to create user profile. Please try again."
+          };
+        }
+      } else {
+        userData = userSnap.data();
+        // Update last login
+        try {
+          await setDoc(userRef, { lastLogin: new Date() }, { merge: true });
+        } catch (updateError) {
+          console.warn("Failed to update last login:", updateError);
+        }
+      }
+
+      // ✅ Check admin role
+      if (userData.role !== "admin") {
+        await signOut(auth);
+        return {
+          success: false,
+          error: "Access denied. Admin privileges required."
+        };
+      }
+
       return { success: true, user: result.user };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
+  // 🚪 Logout
   const logout = async () => {
     try {
       await signOut(auth);
@@ -70,9 +159,5 @@ export const AuthProvider = ({ children }) => {
     logout
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

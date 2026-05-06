@@ -10,7 +10,8 @@ class DemoAuth {
   // Simulate sign in with email and password
   async signInWithEmailAndPassword(auth, email, password) {
     // Demo admin credentials
-    if (email === "admin@gkghealth.com" && password === "admin123") {
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || "admin@gkghealth.com";
+    if (email === adminEmail && password === "admin123") {
       const user = {
         uid: "demo-admin-uid",
         email: "admin@gkghealth.com",
@@ -22,11 +23,13 @@ class DemoAuth {
       return { user };
     }
 
-    // For demo purposes, accept any email/password combination
+    const safeEmail = typeof email === "string" ? email.trim() : "demo-user@example.com";
+    const displayName = safeEmail.includes("@") ? safeEmail.split("@")[0] : safeEmail;
+
     const user = {
       uid: `demo-user-${Date.now()}`,
-      email: email,
-      displayName: email.split('@')[0],
+      email: safeEmail,
+      displayName,
       emailVerified: true
     };
     this.currentUser = user;
@@ -108,10 +111,52 @@ class DemoFirestore {
         }
       ],
       bookings: [],
+      staff: [
+        {
+          id: "staff1",
+          name: "Dr. Sarah Johnson",
+          role: "Physician",
+          specialty: "Internal Medicine",
+          email: "sarah.johnson@gkghealth.com",
+          phone: "+233 XX XXX XXXX",
+          isActive: true,
+          createdAt: new Date()
+        },
+        {
+          id: "staff2",
+          name: "Nurse Michael Chen",
+          role: "Registered Nurse",
+          specialty: "Home Care",
+          email: "michael.chen@gkghealth.com",
+          phone: "+233 XX XXX XXXX",
+          isActive: true,
+          createdAt: new Date()
+        },
+        {
+          id: "staff3",
+          name: "Dr. Emily Davis",
+          role: "Physician",
+          specialty: "Geriatrics",
+          email: "emily.davis@gkghealth.com",
+          phone: "+233 XX XXX XXXX",
+          isActive: true,
+          createdAt: new Date()
+        },
+        {
+          id: "staff4",
+          name: "Nurse David Wilson",
+          role: "Registered Nurse",
+          specialty: "Wound Care",
+          email: "david.wilson@gkghealth.com",
+          phone: "+233 XX XXX XXXX",
+          isActive: true,
+          createdAt: new Date()
+        }
+      ],
       users: [
         {
           uid: "demo-admin-uid",
-          email: "admin@gkghealth.com",
+          email: import.meta.env.VITE_ADMIN_EMAIL || "admin@gkghealth.com",
           role: "admin",
           displayName: "Demo Admin",
           createdAt: new Date()
@@ -189,6 +234,3 @@ export const db = {
   collection: (name) => demoFirestore.collection(name),
   doc: (path) => demoFirestore.doc(path)
 };
-
-// Export functions that match Firebase API
-export { collection, doc, addDoc, getDocs, setDoc, updateDoc, onSnapshot } from "firebase/firestore";

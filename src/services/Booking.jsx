@@ -1,5 +1,4 @@
-import { db } from "../firebase/firebaseConfig";
-import { collection, addDoc, Timestamp, query, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { db, collection, addDoc, Timestamp, query, orderBy, onSnapshot, doc, updateDoc } from "../firebase/firebaseConfig";
 
 export const createBooking = async (bookingData) => {
   try {

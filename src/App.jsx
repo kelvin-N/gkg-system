@@ -1,10 +1,32 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import Services from "./pages/Services";
 import Booking from "./pages/Booking";
-import Admin from "./pages/Admin";
+import AdminDashboard from "./pages/AdminDashboard";
 import Login from "./pages/Login";
 import AddServices from "./pages/AddServices";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+
+function RequireAdmin({ children }) {
+  const { isAdmin, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-600 mx-auto mb-4" />
+          <p className="text-gray-700 dark:text-gray-300">Checking admin access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return children;
+}
 
 function App() {
   return (
@@ -115,9 +137,9 @@ function App() {
 
             <Route path="/services" element={<Services />} />
             <Route path="/booking" element={<Booking />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
             <Route path="/login" element={<Login />} />
-            <Route path="/add-services" element={<AddServices />} />
+            <Route path="/add-services" element={<RequireAdmin><AddServices /></RequireAdmin>} />
           </Routes>
         </div>
       </main>

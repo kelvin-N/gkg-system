@@ -36,7 +36,7 @@ const Services = () => {
               <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-3">{service.category}</p>
               <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">{service.description}</p>
               <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">GHS {service.price}</span>
+                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">${service.price}</span>
                 <button className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition">
                   Book Now
                 </button>

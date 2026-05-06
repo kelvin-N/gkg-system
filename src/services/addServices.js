@@ -1,5 +1,4 @@
-import { db } from "../firebase/firebaseConfig";
-import { collection, addDoc } from "firebase/firestore";
+import { db, collection, addDoc } from "../firebase/firebaseConfig";
 
 const servicesData = [
   {
