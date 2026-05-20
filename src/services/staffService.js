@@ -47,19 +47,31 @@ export const updateStaff = async (staffId, updates) => {
 
 export const subscribeStaff = (onUpdate, onError) => {
   const staffCollection = collection(db, "staff");
+  let unsubscribe = () => {};
 
-  return onSnapshot(
-    staffCollection,
-    (snapshot) => {
-      const staffList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      onUpdate(staffList);
-    },
-    (error) => {
-      console.error("Error subscribing to staff:", error);
-      if (onError) onError(error);
+  try {
+    const result = onSnapshot(
+      staffCollection,
+      (snapshot) => {
+        const staffList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        onUpdate(staffList);
+      },
+      (error) => {
+        console.error("Error subscribing to staff:", error);
+        if (onError) onError(error);
+      }
+    );
+
+    if (typeof result === "function") {
+      unsubscribe = result;
     }
-  );
+  } catch (error) {
+    console.error("Error initializing staff subscription:", error);
+    if (onError) onError(error);
+  }
+
+  return unsubscribe;
 };

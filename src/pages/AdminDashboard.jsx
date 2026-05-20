@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { subscribeBookings, updateBookingStatus, assignStaffToBooking } from "../services/Booking";
 import { subscribeStaff } from "../services/staffService";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,7 +13,6 @@ const AdminDashboard = () => {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [assigningStaff, setAssigningStaff] = useState(null);
 
-  // Filter states
   const [statusFilter, setStatusFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -25,10 +24,10 @@ const AdminDashboard = () => {
     const unsubscribeBookings = subscribeBookings(
       (latestBookings) => {
         setBookings(latestBookings);
-        setLoading(false);
         setError("");
+        setLoading(false);
       },
-      (_snapshotError) => {
+      () => {
         setError("Unable to load bookings. Please refresh the page.");
         setLoading(false);
       }
@@ -44,62 +43,103 @@ const AdminDashboard = () => {
     );
 
     return () => {
-      unsubscribeBookings();
-      unsubscribeStaff();
+      unsubscribeBookings?.();
+      unsubscribeStaff?.();
     };
   }, [isAdmin]);
 
-  // Filtered bookings based on current filters
-  const filteredBookings = useMemo(() => {
-    return bookings.filter(booking => {
-      // Status filter
-      if (statusFilter !== "all" && booking.status !== statusFilter) return false;
+  const parseBookingDate = useCallback((booking) => {
+    const value = booking.createdAt || booking.date;
+    if (!value) return null;
+    return value?.toDate ? value.toDate() : new Date(value);
+  }, []);
 
-      // Service filter
+  const isBookingInDateRange = useCallback((bookingDate) => {
+    if (dateFilter === "all") return true;
+
+    const today = new Date();
+    const bookingDay = bookingDate.toDateString();
+
+    switch (dateFilter) {
+      case "today":
+        return bookingDay === today.toDateString();
+      case "yesterday": {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        return bookingDay === yesterday.toDateString();
+      }
+      case "week": {
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
+        return bookingDate >= weekAgo;
+      }
+      case "month": {
+        const monthAgo = new Date(today);
+        monthAgo.setMonth(today.getMonth() - 1);
+        return bookingDate >= monthAgo;
+      }
+      default:
+        return true;
+    }
+  }, [dateFilter]);
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((booking) => {
+      if (statusFilter !== "all" && booking.status !== statusFilter) return false;
       if (serviceFilter !== "all" && booking.service !== serviceFilter) return false;
 
-      // Staff filter
+      const assignedStaffId = booking.assignedStaff?.id;
       if (staffFilter !== "all") {
-        const assignedStaffId = booking.assignedStaff?.id;
-        if (staffFilter === "unassigned" && assignedStaffId) return false;
-        if (staffFilter !== "unassigned" && assignedStaffId !== staffFilter) return false;
+        if (staffFilter === "unassigned") return !assignedStaffId;
+        return assignedStaffId === staffFilter;
       }
 
-      // Date filter
       if (dateFilter !== "all") {
-        const bookingDate = booking.createdAt?.toDate ? booking.createdAt.toDate() : new Date(booking.createdAt);
-        const today = new Date();
-        const bookingDay = bookingDate.toDateString();
-
-        switch (dateFilter) {
-          case "today":
-            if (bookingDay !== today.toDateString()) return false;
-            break;
-          case "yesterday":
-            const yesterday = new Date(today);
-            yesterday.setDate(today.getDate() - 1);
-            if (bookingDay !== yesterday.toDateString()) return false;
-            break;
-          case "week":
-            const weekAgo = new Date(today);
-            weekAgo.setDate(today.getDate() - 7);
-            if (bookingDate < weekAgo) return false;
-            break;
-          case "month":
-            const monthAgo = new Date(today);
-            monthAgo.setMonth(today.getMonth() - 1);
-            if (bookingDate < monthAgo) return false;
-            break;
-        }
+        const bookingDate = parseBookingDate(booking);
+        if (!bookingDate || !isBookingInDateRange(bookingDate)) return false;
       }
 
       return true;
     });
-  }, [bookings, statusFilter, serviceFilter, dateFilter, staffFilter]);
+  }, [bookings, statusFilter, serviceFilter, staffFilter, dateFilter, parseBookingDate, isBookingInDateRange]);
 
-  // Get unique services for filter dropdown
+  const activeFilters = useMemo(() => {
+    const filters = [];
+    if (statusFilter !== "all") filters.push(`Status: ${statusFilter}`);
+    if (serviceFilter !== "all") filters.push(`Service: ${serviceFilter}`);
+    if (dateFilter !== "all") {
+      const labelMap = {
+        today: "Today",
+        yesterday: "Yesterday",
+        week: "Last 7 days",
+        month: "Last 30 days"
+      };
+      filters.push(`Date: ${labelMap[dateFilter] || dateFilter}`);
+    }
+    if (staffFilter !== "all") {
+      if (staffFilter === "unassigned") {
+        filters.push("Staff: Unassigned");
+      } else {
+        const staffName = staffMembers.find((staff) => staff.id === staffFilter)?.name;
+        filters.push(`Staff: ${staffName || staffFilter}`);
+      }
+    }
+    return filters;
+  }, [statusFilter, serviceFilter, dateFilter, staffFilter, staffMembers]);
+
+  const getStatusBadgeClasses = (status) => {
+    switch (status) {
+      case "confirmed":
+        return "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+      case "cancelled":
+        return "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+      default:
+        return "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    }
+  };
+
   const uniqueServices = useMemo(() => {
-    const services = new Set(bookings.map(booking => booking.service));
+    const services = new Set(bookings.map((booking) => booking.service).filter(Boolean));
     return Array.from(services).sort();
   }, [bookings]);
 
@@ -113,12 +153,13 @@ const AdminDashboard = () => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "-";
-    const date = timestamp.toDate ? timestamp.toDate() : timestamp;
+    const date = timestamp?.toDate ? timestamp.toDate() : timestamp;
     return new Date(date).toLocaleString();
   };
 
   const handleStatusUpdate = async (bookingId, newStatus) => {
     setUpdatingStatus(bookingId);
+    setError("");
     try {
       await updateBookingStatus(bookingId, newStatus);
     } catch {
@@ -130,6 +171,7 @@ const AdminDashboard = () => {
 
   const handleStaffAssignment = async (bookingId, staffId, staffName) => {
     setAssigningStaff(bookingId);
+    setError("");
     try {
       await assignStaffToBooking(bookingId, staffId, staffName);
     } catch {
@@ -140,7 +182,19 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch (logoutError) {
+      console.error("Logout failed:", logoutError);
+      setError("Logout failed. Please try again.");
+    }
+  };
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setServiceFilter("all");
+    setDateFilter("all");
+    setStaffFilter("all");
   };
 
   if (!isAdmin) {
@@ -218,7 +272,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Booking Filters */}
         <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Filter Bookings</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -244,7 +297,7 @@ const AdminDashboard = () => {
                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               >
                 <option value="all">All Services</option>
-                {uniqueServices.map(service => (
+                {uniqueServices.map((service) => (
                   <option key={service} value={service}>{service}</option>
                 ))}
               </select>
@@ -274,7 +327,7 @@ const AdminDashboard = () => {
               >
                 <option value="all">All Staff</option>
                 <option value="unassigned">Unassigned</option>
-                {staffMembers.map(staff => (
+                {staffMembers.map((staff) => (
                   <option key={staff.id} value={staff.id}>{staff.name}</option>
                 ))}
               </select>
@@ -282,21 +335,28 @@ const AdminDashboard = () => {
           </div>
 
           {(statusFilter !== "all" || serviceFilter !== "all" || dateFilter !== "all" || staffFilter !== "all") && (
-            <div className="mt-4 flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {filteredBookings.length} of {bookings.length} bookings
-              </span>
-              <button
-                onClick={() => {
-                  setStatusFilter("all");
-                  setServiceFilter("all");
-                  setDateFilter("all");
-                  setStaffFilter("all");
-                }}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
-              >
-                Clear filters
-              </button>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {activeFilters.map((filter) => (
+                  <span
+                    key={filter}
+                    className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 px-3 py-1 text-xs font-semibold"
+                  >
+                    {filter}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Showing {filteredBookings.length} of {bookings.length} bookings
+                </span>
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+                >
+                  Clear filters
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -337,11 +397,7 @@ const AdminDashboard = () => {
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{booking.service || "—"}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{booking.date || "—"}</td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                        booking.status === "confirmed" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
-                        booking.status === "cancelled" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
-                        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                      }`}>
+                      <span className={getStatusBadgeClasses(booking.status || "pending")}>
                         {booking.status || "pending"}
                       </span>
                     </td>
@@ -369,7 +425,7 @@ const AdminDashboard = () => {
                       <select
                         value={booking.assignedStaff?.id || ""}
                         onChange={(e) => {
-                          const selectedStaff = staffMembers.find(staff => staff.id === e.target.value);
+                          const selectedStaff = staffMembers.find((staff) => staff.id === e.target.value);
                           if (selectedStaff) {
                             handleStaffAssignment(booking.id, selectedStaff.id, selectedStaff.name);
                           }

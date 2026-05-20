@@ -13,36 +13,64 @@ const Booking = () => {
   });
   const [status, setStatus] = useState("");
   const [statusType, setStatusType] = useState(""); // 'success' or 'error'
+  const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  const serviceOptions = [
+    "Nursing Care",
+    "Physical Therapy",
+    "Medical Check-up",
+    "Home Care Assistance",
+    "Home Health Care",
+    "House Keeping",
+    "Rehabilitation",
+    "Other"
+  ];
+
+  const resetForm = () => {
+    setForm({ name: "", email: "", phone: "", service: "", date: "", message: "" });
+    setStatus("");
+    setStatusType("");
+    setFormErrors({});
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!form.name || !form.email || !form.service || !form.date) {
-      setStatus("Please complete all required fields.");
+    const errors = {};
+    if (!form.name.trim()) errors.name = "Full name is required.";
+    if (!form.email.trim()) errors.email = "Email address is required.";
+    if (!form.service) errors.service = "Please select a service.";
+    if (!form.date) errors.date = "Preferred date is required.";
+
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      setStatus("Please complete all required fields before submitting.");
       setStatusType("error");
       return;
     }
 
     setSaving(true);
     setStatus("");
+    setFormErrors({});
 
-    try {
-      await createBooking(form);
+    const result = await createBooking(form);
+    if (result.success) {
       setStatus("Booking request sent successfully! We will contact you within 24 hours.");
       setStatusType("success");
       setForm({ name: "", email: "", phone: "", service: "", date: "", message: "" });
-    } catch {
-      setStatus("Failed to send booking request. Please try again or contact us directly.");
+    } else {
+      setStatus(result.error || "Failed to send booking request. Please try again or contact us directly.");
       setStatusType("error");
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
   };
 
   return (
@@ -81,6 +109,7 @@ const Booking = () => {
                   placeholder="Enter your full name"
                   required
                 />
+                {formErrors.name && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{formErrors.name}</p>}
               </div>
 
               {/* Email Field */}
@@ -97,6 +126,7 @@ const Booking = () => {
                   placeholder="your@email.com"
                   required
                 />
+                {formErrors.email && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{formErrors.email}</p>}
               </div>
 
               {/* Phone Field */}
@@ -127,15 +157,11 @@ const Booking = () => {
                   required
                 >
                   <option value="">Select a service</option>
-                  <option value="Nursing Care">Nursing Care</option>
-                  <option value="Physical Therapy">Physical Therapy</option>
-                  <option value="Medical Check-up">Medical Check-up</option>
-                  <option value="Home Care Assistance">Home Care Assistance</option>
-                  <option value="Home Health Care">Home Health Care</option>
-                  <option value="House Keeping">House Keeping</option>
-                  <option value="Rehabilitation">Rehabilitation</option>
-                  <option value="Other">Other</option>
+                  {serviceOptions.map((service) => (
+                    <option key={service} value={service}>{service}</option>
+                  ))}
                 </select>
+                {formErrors.service && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{formErrors.service}</p>}
               </div>
 
               {/* Date Field */}
@@ -152,6 +178,7 @@ const Booking = () => {
                   min={new Date().toISOString().split('T')[0]}
                   required
                 />
+                {formErrors.date && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{formErrors.date}</p>}
               </div>
 
               {/* Message Field */}
@@ -171,7 +198,7 @@ const Booking = () => {
             </div>
 
             {/* Submit Button */}
-            <div className="mt-8">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
                 type="submit"
                 disabled={saving}
@@ -190,6 +217,13 @@ const Booking = () => {
                     Send Booking Request
                   </>
                 )}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="w-full btn-secondary"
+              >
+                Reset Form
               </button>
             </div>
           </form>
@@ -212,6 +246,30 @@ const Booking = () => {
                   </svg>
                 )}
                 <span>{status}</span>
+              </div>
+            </div>
+          )}
+
+          {(form.service || form.date || form.name || form.email) && (
+            <div className="mt-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Booking preview</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-white dark:bg-gray-800 p-4 border border-gray-200 dark:border-gray-700">
+                  <p className="text-xs uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400 mb-2">Name</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{form.name || "N/A"}</p>
+                </div>
+                <div className="rounded-xl bg-white dark:bg-gray-800 p-4 border border-gray-200 dark:border-gray-700">
+                  <p className="text-xs uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400 mb-2">Email</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{form.email || "N/A"}</p>
+                </div>
+                <div className="rounded-xl bg-white dark:bg-gray-800 p-4 border border-gray-200 dark:border-gray-700">
+                  <p className="text-xs uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400 mb-2">Service</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{form.service || "Not selected"}</p>
+                </div>
+                <div className="rounded-xl bg-white dark:bg-gray-800 p-4 border border-gray-200 dark:border-gray-700">
+                  <p className="text-xs uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400 mb-2">Preferred Date</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{form.date ? new Date(form.date).toLocaleDateString() : "Not selected"}</p>
+                </div>
               </div>
             </div>
           )}

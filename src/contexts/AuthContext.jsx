@@ -129,14 +129,17 @@ export const AuthProvider = ({ children }) => {
       // ✅ Check admin role
       if (userData.role !== "admin") {
         await signOut(auth);
+        setLoading(false);
         return {
           success: false,
           error: "Access denied. Admin privileges required."
         };
       }
 
+      setLoading(false);
       return { success: true, user: result.user };
     } catch (error) {
+      setLoading(false);
       return { success: false, error: error.message };
     }
   };

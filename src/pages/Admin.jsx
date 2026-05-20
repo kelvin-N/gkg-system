@@ -1,28 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { subscribeBookings, updateBookingStatus, assignStaffToBooking } from "../services/Booking";
+import { subscribeStaff } from "../services/staffService";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 
 const Admin = () => {
   const { isAdmin, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
+  const [staffMembers, setStaffMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [assigningStaff, setAssigningStaff] = useState(null);
 
-  // Mock staff data - in a real app, this would come from a staff collection
-  const staffMembers = [
-    { id: "staff1", name: "Dr. Sarah Johnson" },
-    { id: "staff2", name: "Nurse Michael Chen" },
-    { id: "staff3", name: "Dr. Emily Davis" },
-    { id: "staff4", name: "Nurse David Wilson" }
-  ];
-
   useEffect(() => {
     if (!isAdmin) return;
 
-    const unsubscribe = subscribeBookings(
+    const unsubscribeBookings = subscribeBookings(
       (latestBookings) => {
         setBookings(latestBookings);
         setLoading(false);
@@ -34,7 +28,19 @@ const Admin = () => {
       }
     );
 
-    return () => unsubscribe();
+    const unsubscribeStaff = subscribeStaff(
+      (latestStaff) => {
+        setStaffMembers(latestStaff);
+      },
+      (staffError) => {
+        console.error("Error loading staff:", staffError);
+      }
+    );
+
+    return () => {
+      unsubscribeBookings?.();
+      unsubscribeStaff?.();
+    };
   }, [isAdmin]);
 
   const stats = useMemo(() => {

@@ -2,45 +2,63 @@ import { db, collection, addDoc, Timestamp, query, orderBy, onSnapshot, doc, upd
 
 export const createBooking = async (bookingData) => {
   try {
-    const docRef = await addDoc(collection(db, "bookings"), {
+    const bookingPayload = {
       ...bookingData,
       status: "pending",
-      createdAt: Timestamp.now()
-    });
+      createdAt: Timestamp?.now ? Timestamp.now() : new Date(),
+      updatedAt: Timestamp?.now ? Timestamp.now() : new Date()
+    };
 
-    console.log("Booking created:", docRef.id);
-
+    const docRef = await addDoc(collection(db, "bookings"), bookingPayload);
+    return { success: true, id: docRef.id, booking: bookingPayload };
   } catch (error) {
     console.error("Error creating booking:", error);
-    throw error;
+    return { success: false, error: error.message || "Booking creation failed." };
   }
 };
 
 export const subscribeBookings = (callback, onError) => {
   const bookingsQuery = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
-  return onSnapshot(bookingsQuery, (snapshot) => {
-    const bookings = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    callback(bookings);
-  }, (error) => {
-    console.error("Error subscribing to bookings:", error);
+  let unsubscribe = () => {};
+
+  try {
+    const result = onSnapshot(
+      bookingsQuery,
+      (snapshot) => {
+        const bookings = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        callback(bookings);
+      },
+      (error) => {
+        console.error("Error subscribing to bookings:", error);
+        if (onError) onError(error);
+      }
+    );
+
+    if (typeof result === "function") {
+      unsubscribe = result;
+    }
+  } catch (error) {
+    console.error("Error initializing booking subscription:", error);
     if (onError) onError(error);
-  });
+  }
+
+  return unsubscribe;
 };
 
 export const updateBookingStatus = async (bookingId, status) => {
   try {
     const bookingRef = doc(db, "bookings", bookingId);
     await updateDoc(bookingRef, {
-      status: status,
-      updatedAt: Timestamp.now()
+      status,
+      updatedAt: Timestamp?.now ? Timestamp.now() : new Date()
     });
-    console.log("Booking status updated:", bookingId, status);
+    return { success: true };
   } catch (error) {
     console.error("Error updating booking status:", error);
-    throw error;
+    return { success: false, error: error.message || "Failed to update booking status." };
   }
 };
 
@@ -52,11 +70,11 @@ export const assignStaffToBooking = async (bookingId, staffId, staffName) => {
         id: staffId,
         name: staffName
       },
-      updatedAt: Timestamp.now()
+      updatedAt: Timestamp?.now ? Timestamp.now() : new Date()
     });
-    console.log("Staff assigned to booking:", bookingId, staffName);
+    return { success: true };
   } catch (error) {
     console.error("Error assigning staff to booking:", error);
-    throw error;
+    return { success: false, error: error.message || "Failed to assign staff." };
   }
 };

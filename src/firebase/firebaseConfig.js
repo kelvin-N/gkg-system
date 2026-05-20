@@ -52,42 +52,45 @@ if (USE_DEMO) {
   addDoc = async (collectionRef, data) => await collectionRef.add(data);
   getDocs = async (collectionRef) => await collectionRef.get();
   getDoc = async (docRef) => await docRef.get();
-  setDoc = async (docRef, data) => await docRef.set(data);
+  setDoc = async (docRef, data, options) => await docRef.set(data, options);
   updateDoc = async (docRef, data) => await docRef.update(data);
   query = (collectionRef, ...constraints) => ({ collectionRef, constraints });
   orderBy = (fieldPath, directionStr = "asc") => ({ type: "orderBy", fieldPath, directionStr });
-  onSnapshot = async (queryOrCollectionRef, callback, errorCallback) => {
-    try {
-      const result = queryOrCollectionRef.collectionRef
-        ? await queryOrCollectionRef.collectionRef.get()
-        : await queryOrCollectionRef.get();
+  onSnapshot = (queryOrCollectionRef, callback, errorCallback) => {
+    (async () => {
+      try {
+        const result = queryOrCollectionRef.collectionRef
+          ? await queryOrCollectionRef.collectionRef.get()
+          : await queryOrCollectionRef.get();
 
-      let docs = result.docs;
+        let docs = result.docs;
 
-      const orderConstraint = queryOrCollectionRef.constraints?.find((constraint) => constraint.type === "orderBy");
-      if (orderConstraint) {
-        docs = [...docs].sort((a, b) => {
-          const aValue = a.data()[orderConstraint.fieldPath];
-          const bValue = b.data()[orderConstraint.fieldPath];
-          if (aValue === bValue) return 0;
-          const direction = orderConstraint.directionStr === "desc" ? -1 : 1;
-          return aValue < bValue ? -direction : direction;
-        });
+        const orderConstraint = queryOrCollectionRef.constraints?.find((constraint) => constraint.type === "orderBy");
+        if (orderConstraint) {
+          docs = [...docs].sort((a, b) => {
+            const aValue = a.data()[orderConstraint.fieldPath];
+            const bValue = b.data()[orderConstraint.fieldPath];
+            if (aValue === bValue) return 0;
+            const direction = orderConstraint.directionStr === "desc" ? -1 : 1;
+            return aValue < bValue ? -direction : direction;
+          });
+        }
+
+        callback({ docs });
+      } catch (error) {
+        if (errorCallback) {
+          errorCallback(error);
+        }
       }
-
-      callback({ docs });
-    } catch (error) {
-      if (errorCallback) {
-        errorCallback(error);
-      }
-    }
+    })();
 
     return () => {};
   };
   Timestamp = { now: () => new Date() };
-  signInWithEmailAndPassword = (_auth, email, password) => demoFirebase.auth.signInWithEmailAndPassword(null, email, password);
-  signOut = (_auth) => demoFirebase.auth.signOut();
-  onAuthStateChanged = (_auth, callback) => demoFirebase.auth.onAuthStateChanged(callback);
+  signInWithEmailAndPassword = (_auth, email, password) => demoFirebase.auth.signInWithEmailAndPassword(_auth, email, password);
+  signOut = (_auth) => demoFirebase.auth.signOut(_auth);
+  onAuthStateChanged = (_auth, callback) => demoFirebase.auth.onAuthStateChanged(_auth, callback);
+
 } else {
   console.log("🔥 Using Real Firebase");
 

@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import Services from "./pages/Services";
 import Booking from "./pages/Booking";
@@ -31,6 +32,7 @@ function RequireAdmin({ children }) {
 function App() {
   return (
     <AuthProvider>
+      <ErrorBoundary>
       <Router>
       {/* Modern Header with Gradient Background */}
       <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-blue-800 dark:via-blue-900 dark:to-blue-900 shadow-lg">
@@ -207,9 +209,44 @@ function App() {
           </div>
         </div>
       </footer>
-    </Router>
+      </Router>
+      </ErrorBoundary>
     </AuthProvider>
   );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(_error, _info) {
+    // You could log to an external service here
+    // console.error(_error, _info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-red-50 dark:bg-gray-900 p-4">
+          <div className="max-w-2xl w-full text-center bg-white dark:bg-gray-800 rounded-lg p-8 shadow">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h2>
+            <pre className="text-sm text-left overflow-auto max-h-48 p-2 bg-gray-100 dark:bg-gray-700 rounded">{String(this.state.error && this.state.error.stack ? this.state.error.stack : this.state.error)}</pre>
+            <div className="mt-6">
+              <button onClick={() => window.location.reload()} className="btn-primary">Reload</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default App;

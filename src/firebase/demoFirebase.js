@@ -169,16 +169,17 @@ class DemoFirestore {
   collection(name) {
     return {
       get: async () => ({
-        docs: this.collections[name].map((doc, index) => ({
+        docs: (this.collections[name] || []).map((doc, index) => ({
           id: doc.id || `doc-${index}`,
           data: () => doc
         }))
       }),
       add: async (data) => {
         const newDoc = { ...data, id: `doc-${Date.now()}`, createdAt: new Date() };
-        if (name === 'bookings') {
-          this.collections.bookings.push(newDoc);
+        if (!this.collections[name]) {
+          this.collections[name] = [];
         }
+        this.collections[name].push(newDoc);
         return { id: newDoc.id };
       }
     };
@@ -195,13 +196,13 @@ class DemoFirestore {
           exists: () => !!doc
         };
       },
-      set: async (data) => {
+      set: async (data, _options) => {
         if (!this.collections[collectionName]) {
           this.collections[collectionName] = [];
         }
         const existingIndex = this.collections[collectionName].findIndex(d => d.id === docId || d.uid === docId);
         if (existingIndex >= 0) {
-          this.collections[collectionName][existingIndex] = { ...data, id: docId };
+          this.collections[collectionName][existingIndex] = { ...this.collections[collectionName][existingIndex], ...data, id: docId };
         } else {
           this.collections[collectionName].push({ ...data, id: docId });
         }
@@ -225,9 +226,9 @@ const demoFirestore = new DemoFirestore();
 
 // Export demo versions that mimic Firebase API
 export const auth = {
-  signInWithEmailAndPassword: (email, password) => demoAuth.signInWithEmailAndPassword(null, email, password),
-  signOut: () => demoAuth.signOut(),
-  onAuthStateChanged: (callback) => demoAuth.onAuthStateChanged(callback)
+  signInWithEmailAndPassword: (auth, email, password) => demoAuth.signInWithEmailAndPassword(auth, email, password),
+  signOut: (auth) => demoAuth.signOut(auth),
+  onAuthStateChanged: (auth, callback) => demoAuth.onAuthStateChanged(callback)
 };
 
 export const db = {
